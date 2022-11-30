@@ -1,36 +1,33 @@
 import socket
-import random
-
-high_score = 0
-
-def generate_random_number() -> int:
-    return random.randint(0, 50)
+from utils import generate_random_number
 
 
-def play(client: socket):
-    return
-    # number = generate_random_number()
-    # guess = -1
-    # score = 5000
+def play_vs_computer(s: socket, high_score):
+    number = generate_random_number()
+    guess = -1
+    score = 5100
 
-    # while guess != number:
-    #     guess = int(client.recv().decode())
-    #     score -= 100 if score > 0 else 0
-    #     high_score = score if score > high_score else high_score
-    #     message: str
+    while guess != number:
+        guess = int(s.recv(4).decode())
+        score -= 100 if score > 0 else 0
+        message: str
         
-    #     if guess == number:
-    #         message = f'''Congratulations, you have guessed the number!
-    #         High Score: {high_score}
-    #         Current Score: {score}\n'''
-    #     elif (guess > number):
-    #         message = "Your guess is too high. Try going lower!\n"
-    #     else:
-    #         message = "Your guess is too low. Try going higher!\n"
+        if guess == number:
+            high_score = score if score > high_score else high_score
 
-    #     client.send(message.encode())
+            message = f"Congratulations, you have guessed the number!\nHigh Score: {high_score}\nCurrent Score: {score}\n"
+        elif (guess > number):
+            message = "Your guess is too high. Try going lower!\n"
+        else:
+            message = "Your guess is too low. Try going higher!\n"
 
-    # return 
+        s.send(message.encode())
+
+    return high_score
+
+
+def play_vs_player(s1: socket, s2: socket):
+    return
 
 
 def run_server():
@@ -43,21 +40,24 @@ def run_server():
     server_socket.listen(2)
 
     print("Awaiting connection...")
-    client_socket, address = server_socket.accept()
+    client1_socket, address = server_socket.accept()
     print(f"Connection successfully established from address {address}.")
 
+    high_score = 0
+
     while True:
-        option = client_socket.recv(4).decode()
+        option = client1_socket.recv(4).decode()
 
         if option == '1':
-            play(client_socket)
+            score = play_vs_computer(client1_socket, high_score)
+            high_score = score if score > high_score else high_score
         elif option == '2':
-            play(client_socket)
+            play_vs_player(client1_socket)
         elif option == '4':
             break
 
     print("Player disconnected.")
-    client_socket.close()
+    client1_socket.close()
     server_socket.close()
 
 
