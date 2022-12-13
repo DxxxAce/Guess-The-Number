@@ -1,9 +1,10 @@
 import socket
-from utils import PORT, STARTING_SCORE, STARTING_GUESS, SCORE_PER_GUESS, BUFF_SIZE, LONG_BUFF_SIZE,\
+from concurrent.futures import ThreadPoolExecutor
+from utils import STARTING_PORT, STARTING_SCORE, STARTING_GUESS, SCORE_PER_GUESS, BUFF_SIZE, LONG_BUFF_SIZE, MAX_SESSIONS,\
     PLAY_VS_COMPUTER, PLAY_VS_PLAYER, EXIT, FORCE_QUIT, RETURN_TO_MENU, generate_random_number
 
 
-def play_vs_computer(s: socket, high_score) -> int:
+def play_vs_computer(s: socket, thread: int, high_score) -> int:
     number = generate_random_number()
     guess = STARTING_GUESS
     score = STARTING_SCORE
@@ -19,7 +20,7 @@ def play_vs_computer(s: socket, high_score) -> int:
         if guess == number:
             high_score = score if score > high_score else high_score
             message = f"Congratulations, you have guessed the number!\nCurrent Score: {score}\nHigh Score: {high_score}\n"
-            print(f"Game ended. Player finished with a score of {score}.\n")
+            print(f"[Thread {thread + 1}] Game ended. Player finished with a score of {score}.\n")
         elif (guess > number):
             message = "Your guess is too high. Try going lower!\n"
         else:
@@ -30,7 +31,7 @@ def play_vs_computer(s: socket, high_score) -> int:
     return high_score
 
 
-def play_vs_player(s1: socket, s2: socket):
+def play_vs_player(s1: socket, s2: socket, thread: int):
     high_score = 0
     playing = True
 
@@ -79,80 +80,89 @@ def play_vs_player(s1: socket, s2: socket):
         if play_again == 'n':
             playing = False
             s2.send(play_again.encode())
-            print("Game ended.")
+            print(f"[Thread {thread + 1}] Game ended.")
         elif play_again == FORCE_QUIT:
             s2.send(play_again.encode())
             return FORCE_QUIT
 
 
-def run_server():
+def run_server(thread: int):
     host = socket.gethostname()
-    port = PORT
+    port = STARTING_PORT + thread
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
 
     server_socket.listen(2)
-    player_type = "host"
-
-    try:
-        print("Awaiting connection...")
-        client1_socket, address1 = server_socket.accept()
-        print(f"Connection successfully established from address {address1}.\n")
     
-        client1_socket.send(player_type.encode())
-    
-        player_type = "challenger"
-        high_score = 0
+    while True:
+        player_type = "host"
 
-        while True:
-            option = client1_socket.recv(BUFF_SIZE).decode()
-            if option == FORCE_QUIT:
-                print("Client connection terminated abruptly...")
-                break
-
-            if option == PLAY_VS_COMPUTER:
-                print("Player vs. Computer starting...")
-                score = play_vs_computer(client1_socket, high_score)
-                if score == FORCE_QUIT:
-                    print("Client connection terminated abruptly...")
-                    break
-                
-                high_score = score if score > high_score else high_score
-            elif option == PLAY_VS_PLAYER:
-                print("Awaiting connection...")
-                client2_socket, address2 = server_socket.accept()
-                client2_socket.send(player_type.encode())
-                message = "Second player joined the match."
-                client1_socket.send(message.encode())
-                print(f"Connection successfully established from address {address2}.\n\nPlayer vs. Player starting...")
-                result = play_vs_player(client1_socket, client2_socket)
-
-                if result == FORCE_QUIT:
-                    print("Client connection terminated abruptly...")
-                    break
-                elif result == RETURN_TO_MENU:
-                    print("Client connection terminated abruptly...")
-                    continue
-            elif option == EXIT:
-                break
-
-        print("Player disconnected.")
-        client1_socket.close()
-        server_socket.close()
-    except:
         try:
-            message = FORCE_QUIT
-            client1_socket.send(message.encode())
-            client2_socket.send(message.encode())
-            client1_socket.close()
-            client2_socket.close()
-        except:
-            print("\nThe server encountered an error.\nShutting down...")
-            return
+            print(f"[Thread {thread + 1}] Awaiting connection...")
+            client1_socket, address1 = server_socket.accept()
+            print(f"[Thread {thread + 1}] Connection successfully established from address {address1}.\n")
+    
+            client1_socket.send(player_type.encode())
+    
+            player_type = "challenger"
+            high_score = 0
 
-        print("\nThe server encountered an error.\nShutting down...")
+            restart = False
+
+            while True:
+                option = client1_socket.recv(BUFF_SIZE).decode()
+                if option == FORCE_QUIT:
+                    print(f"[Thread {thread + 1}] Client connection terminated abruptly...")
+                    break
+
+                if option == PLAY_VS_COMPUTER:
+                    print(f"[Thread {thread + 1}] Player vs. Computer starting...")
+                    score = play_vs_computer(client1_socket, thread, high_score)
+                    if score == FORCE_QUIT:
+                        print(f"[Thread {thread + 1}] Client connection terminated abruptly...")
+                        break
+                
+                    high_score = score if score > high_score else high_score
+                elif option == PLAY_VS_PLAYER:
+                    print(f"[Thread {thread + 1}] Awaiting connection...")
+                    client2_socket, address2 = server_socket.accept()
+                    client2_socket.send(player_type.encode())
+                    message = "Second player joined the match."
+                    client1_socket.send(message.encode())
+                    print(f"[Thread {thread + 1}] Connection successfully established from address {address2}.\n\nPlayer vs. Player starting...")
+                    result = play_vs_player(client1_socket, client2_socket, thread)
+
+                    if result == FORCE_QUIT:
+                        print(f"[Thread {thread + 1}] Client connection terminated abruptly...")
+                        break
+                    elif result == RETURN_TO_MENU:
+                        print(f"[Thread {thread + 1}] Client connection terminated abruptly...")
+                        continue
+                elif option == EXIT:
+                    print(f"[Thread {thread + 1}] Player disconnected.")
+                    restart = True
+                    break
+
+            if restart:
+                continue
+
+            client1_socket.close()
+            server_socket.close()
+        except:
+            try:
+                message = FORCE_QUIT
+                client1_socket.send(message.encode())
+                client2_socket.send(message.encode())
+                client1_socket.close()
+                client2_socket.close()
+            except:
+                print(f"\n[Thread {thread + 1}] The server encountered an error.\nShutting down...")
+                return
+
+            print(f"\n[Thread {thread + 1}] The server encountered an error.\nShutting down...")
 
 
 if __name__ == "__main__":
-    run_server()
+    with ThreadPoolExecutor(MAX_SESSIONS) as executor:
+        _ = [executor.submit(run_server, i) for i in range(MAX_SESSIONS)]

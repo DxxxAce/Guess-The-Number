@@ -1,5 +1,6 @@
+import sys
 import socket
-from utils import PORT, MENU_MESSAGE, CHALLENGER_MESSAGE, HELP_MESSAGE, CONGRATS_HEADER_LENGTH, PLAYER2_WIN_HEADER_LENGTH,\
+from utils import STARTING_PORT, MAX_SESSIONS, MENU_MESSAGE, CHALLENGER_MESSAGE, HELP_MESSAGE, CONGRATS_HEADER_LENGTH, PLAYER2_WIN_HEADER_LENGTH,\
      PLAY_VS_COMPUTER, PLAY_VS_PLAYER, HELP, EXIT, FORCE_QUIT, RETURN_TO_MENU, BUFF_SIZE, LONG_BUFF_SIZE
 
 
@@ -58,9 +59,8 @@ def play_vs_player(s: socket):
             print("Starting new match...")
 
 
-def run_client():
+def run_client(port: int):
     host = socket.gethostname()
-    port = PORT
 
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -181,4 +181,11 @@ def run_client():
 
 
 if __name__ == "__main__":
-    run_client()
+    try:
+        port = int(sys.argv[1])
+        if port in range(STARTING_PORT, STARTING_PORT + MAX_SESSIONS):
+            run_client(port)
+        else:
+            print("Invalid port number. Please try a port between 5050-5054.")
+    except:
+        print("An error occurred. Please try specifying a port number between 5050-5054.")
