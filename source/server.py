@@ -1,15 +1,19 @@
 import socket
-from utils import generate_random_number
+from utils import PORT, STARTING_SCORE, STARTING_GUESS, SCORE_PER_GUESS, BUFF_SIZE, LONG_BUFF_SIZE,\
+    PLAY_VS_COMPUTER, PLAY_VS_PLAYER, EXIT, FORCE_QUIT, RETURN_TO_MENU, generate_random_number
 
 
 def play_vs_computer(s: socket, high_score) -> int:
     number = generate_random_number()
-    guess = -1
-    score = 5100
+    guess = STARTING_GUESS
+    score = STARTING_SCORE
 
     while guess != number:
-        guess = int(s.recv(4).decode())
-        score -= 100 if score > 0 else 0
+        guess = int(s.recv(BUFF_SIZE).decode())
+        if guess == FORCE_QUIT:
+            return FORCE_QUIT
+
+        score -= SCORE_PER_GUESS if score > 0 else 0
         message: str
 
         if guess == number:
@@ -31,16 +35,28 @@ def play_vs_player(s1: socket, s2: socket):
     playing = True
 
     while playing:
-        number = int(s1.recv(1024).decode())
-        guess = -1
-        score = 5100
+        message = s1.recv(LONG_BUFF_SIZE).decode()
+        if message == FORCE_QUIT:
+            s2.send(message.encode())
+            return FORCE_QUIT
+        
+        number = int(message)
+        guess = STARTING_GUESS
+        score = STARTING_SCORE
 
         message = "The host is done picking."
         s2.send(message.encode())
 
         while guess != number:
-            guess = int(s2.recv(4).decode())
-            score -= 100 if score > 0 else 0
+            message = s2.recv(BUFF_SIZE).decode()
+            if message == FORCE_QUIT:
+                message = RETURN_TO_MENU
+                s1.send(message.encode())
+                return RETURN_TO_MENU
+
+            guess = int(message)
+
+            score -= SCORE_PER_GUESS if score > 0 else 0
             message1: str
             message2: str
 
@@ -59,16 +75,19 @@ def play_vs_player(s1: socket, s2: socket):
             s1.send(message1.encode())
             s2.send(message2.encode())
         
-        play_again = s1.recv(4).decode()
+        play_again = s1.recv(BUFF_SIZE).decode()
         if play_again == 'n':
             playing = False
             s2.send(play_again.encode())
             print("Game ended.")
+        elif play_again == FORCE_QUIT:
+            s2.send(play_again.encode())
+            return FORCE_QUIT
 
 
 def run_server():
     host = socket.gethostname()
-    port = 5050
+    port = PORT
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
@@ -76,36 +95,64 @@ def run_server():
     server_socket.listen(2)
     player_type = "host"
 
-    print("Awaiting connection...")
-    client1_socket, address1 = server_socket.accept()
-    print(f"Connection successfully established from address {address1}.\n")
-    client1_socket.send(player_type.encode())
+    try:
+        print("Awaiting connection...")
+        client1_socket, address1 = server_socket.accept()
+        print(f"Connection successfully established from address {address1}.\n")
+    
+        client1_socket.send(player_type.encode())
+    
+        player_type = "challenger"
+        high_score = 0
 
-    player_type = "challenger"
-    high_score = 0
+        while True:
+            option = client1_socket.recv(BUFF_SIZE).decode()
+            if option == FORCE_QUIT:
+                print("Client connection terminated abruptly...")
+                break
 
-    while True:
-        option = client1_socket.recv(4).decode()
+            if option == PLAY_VS_COMPUTER:
+                print("Player vs. Computer starting...")
+                score = play_vs_computer(client1_socket, high_score)
+                if score == FORCE_QUIT:
+                    print("Client connection terminated abruptly...")
+                    break
+                
+                high_score = score if score > high_score else high_score
+            elif option == PLAY_VS_PLAYER:
+                print("Awaiting connection...")
+                client2_socket, address2 = server_socket.accept()
+                client2_socket.send(player_type.encode())
+                message = "Second player joined the match."
+                client1_socket.send(message.encode())
+                print(f"Connection successfully established from address {address2}.\n\nPlayer vs. Player starting...")
+                result = play_vs_player(client1_socket, client2_socket)
 
-        if option == '1':
-            print("Player vs. Computer starting...")
-            score = play_vs_computer(client1_socket, high_score)
-            high_score = score if score > high_score else high_score
-        elif option == '2':
-            print("Awaiting connection...")
-            client2_socket, address2 = server_socket.accept()
-            client2_socket.send(player_type.encode())
-            message = "Second player joined the match."
+                if result == FORCE_QUIT:
+                    print("Client connection terminated abruptly...")
+                    break
+                elif result == RETURN_TO_MENU:
+                    print("Client connection terminated abruptly...")
+                    continue
+            elif option == EXIT:
+                break
+
+        print("Player disconnected.")
+        client1_socket.close()
+        server_socket.close()
+    except:
+        try:
+            message = FORCE_QUIT
             client1_socket.send(message.encode())
-            print(f"Connection successfully established from address {address2}.\n\nPlayer vs. Player starting...")
-            play_vs_player(client1_socket, client2_socket)
-        elif option == '4':
-            break
+            client2_socket.send(message.encode())
+            client1_socket.close()
+            client2_socket.close()
+        except:
+            print("\nThe server encountered an error.\nShutting down...")
+            return
 
-    print("Player disconnected.")
-    client1_socket.close()
-    server_socket.close()
+        print("\nThe server encountered an error.\nShutting down...")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_server()
