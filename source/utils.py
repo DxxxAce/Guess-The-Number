@@ -3,7 +3,8 @@ import random
 __name__ = "utils"
 __doc__ = "Utilities script required for playing Guess The Number."
 
-PORT = 5050
+STARTING_PORT = 5050
+MAX_SESSIONS = 5
 STARTING_SCORE = 5100
 STARTING_GUESS = -1
 SCORE_PER_GUESS = 100
@@ -11,12 +12,13 @@ CONGRATS_HEADER_LENGTH = 15
 PLAYER2_WIN_HEADER_LENGTH = 37
 BUFF_SIZE = 16
 LONG_BUFF_SIZE = 1024
+
 PLAY_VS_COMPUTER = '1'
 PLAY_VS_PLAYER = '2'
 HELP = '3'
 EXIT = '4'
-FORCE_QUIT = '5'
-RETURN_TO_MENU = '6'
+FORCE_QUIT = 'q'
+RETURN_TO_MENU = 'r'
 
 MENU_MESSAGE = '''Welcome to Guess The Number!\n\n
 1. Challenge Computer\n
