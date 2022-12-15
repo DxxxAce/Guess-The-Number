@@ -17,10 +17,11 @@ def play_vs_computer(s: socket):
 
         s.send(guess.encode())
         message = s.recv(LONG_BUFF_SIZE).decode()
+        print(message)
+        
         if message == FORCE_QUIT:
             return FORCE_QUIT
 
-        print(message)
 
 
 def play_vs_player(s: socket):
@@ -122,10 +123,11 @@ def run_client(port: int):
                                 return_to_menu = True
                                 break
 
+                            print(message)
+                            
                         if return_to_menu:
                             break
 
-                            print(message)
 
                         play_again = input("Would you like to play again? (Y/n): ").lower()
                         print()

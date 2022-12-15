@@ -135,7 +135,7 @@ def run_server(thread: int):
 
                     if result == FORCE_QUIT:
                         print(f"[Thread {thread + 1}] Client connection terminated abruptly...")
-                        break
+                        continue
                     elif result == RETURN_TO_MENU:
                         print(f"[Thread {thread + 1}] Client connection terminated abruptly...")
                         continue
@@ -152,15 +152,17 @@ def run_server(thread: int):
         except:
             try:
                 message = FORCE_QUIT
+                restart = True
                 client1_socket.send(message.encode())
                 client2_socket.send(message.encode())
                 client1_socket.close()
                 client2_socket.close()
             except:
                 print(f"\n[Thread {thread + 1}] The server encountered an error.\nShutting down...")
-                return
+                break
 
             print(f"\n[Thread {thread + 1}] The server encountered an error.\nShutting down...")
+            
 
 
 if __name__ == "__main__":
